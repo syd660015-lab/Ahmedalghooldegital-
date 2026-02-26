@@ -1,1 +1,2 @@
-geminiService
+services/
+   geminiService.ts
