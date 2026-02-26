@@ -1,2 +1,6 @@
-services/
-   geminiService.ts
+src/
+ ├── components/
+ ├── services/
+ │     └── geminiService.ts
+ ├── App.tsx
+ ├── main.tsx
