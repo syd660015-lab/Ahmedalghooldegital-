@@ -119,7 +119,9 @@ const App: React.FC = () => {
       ? 'تقرير_نفسي' 
       : mode === AnalysisMode.BEHAVIORAL 
         ? 'تقرير_سلوكي' 
-        : 'تقرير_مقارنة';
+        : mode === AnalysisMode.COMPARISON
+          ? 'تقرير_مقارنة'
+          : 'تحليل_متقدم';
     element.download = `${fileName}_${new Date().toISOString().split('T')[0]}.txt`;
     document.body.appendChild(element);
     element.click();
@@ -189,6 +191,13 @@ const App: React.FC = () => {
                 <Users className="w-4 h-4" />
                 <span className="font-bold text-xs sm:text-sm">مقارنة</span>
               </button>
+              <button
+                onClick={() => setMode(AnalysisMode.ADVANCED)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all ${mode === AnalysisMode.ADVANCED ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span className="font-bold text-xs sm:text-sm">متقدم</span>
+              </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -229,15 +238,18 @@ const App: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-blue-400" />
-                  ملاحظات إضافية أو وصف للمحتوى
+                  {mode === AnalysisMode.ADVANCED ? 'السمات أو الأنماط المراد التركيز عليها' : 'ملاحظات إضافية أو وصف للمحتوى'}
                 </label>
                 <textarea
                   rows={4}
+                  required={mode === AnalysisMode.ADVANCED}
                   placeholder={mode === AnalysisMode.PSYCHOLOGICAL 
                     ? "مثال: المستخدم يميل لنشر صور الطبيعة، يقتبس من الفلسفة الوجودية..." 
                     : mode === AnalysisMode.BEHAVIORAL
                       ? "مثال: ينشر بكثافة في المساء، يتفاعل مع المنشورات السياسية فقط، يشارك الفيديوهات القصيرة..."
-                      : "مثال: الشخص الأول أكثر تحفظاً، الشخص الثاني يميل للصدام الفكري..."}
+                      : mode === AnalysisMode.COMPARISON
+                        ? "مثال: الشخص الأول أكثر تحفظاً، الشخص الثاني يميل للصدام الفكري..."
+                        : "مثال: ركز على سمات القيادة، الميل للانطواء، أو أنماط التفاعل مع المحتوى التقني..."}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-slate-500 resize-none"
                   value={additionalInfo}
                   onChange={(e) => setAdditionalInfo(e.target.value)}
@@ -253,10 +265,10 @@ const App: React.FC = () => {
 
               <button
                 type="submit"
-                className={`w-full bg-gradient-to-r ${mode === AnalysisMode.PSYCHOLOGICAL ? 'from-blue-600 to-indigo-600' : mode === AnalysisMode.BEHAVIORAL ? 'from-indigo-600 to-purple-600' : 'from-cyan-600 to-blue-600'} hover:opacity-90 text-white font-bold py-4 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-3 active:scale-[0.98]`}
+                className={`w-full bg-gradient-to-r ${mode === AnalysisMode.PSYCHOLOGICAL ? 'from-blue-600 to-indigo-600' : mode === AnalysisMode.BEHAVIORAL ? 'from-indigo-600 to-purple-600' : mode === AnalysisMode.COMPARISON ? 'from-cyan-600 to-blue-600' : 'from-amber-600 to-orange-600'} hover:opacity-90 text-white font-bold py-4 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-3 active:scale-[0.98]`}
               >
-                {mode === AnalysisMode.PSYCHOLOGICAL ? <BrainCircuit className="w-5 h-5" /> : mode === AnalysisMode.BEHAVIORAL ? <Activity className="w-5 h-5" /> : <Users className="w-5 h-5" />}
-                بدء {mode === AnalysisMode.COMPARISON ? 'المقارنة التحليلية' : mode === AnalysisMode.PSYCHOLOGICAL ? 'التحليل النفسي' : 'تحليل السلوك'}
+                {mode === AnalysisMode.PSYCHOLOGICAL ? <BrainCircuit className="w-5 h-5" /> : mode === AnalysisMode.BEHAVIORAL ? <Activity className="w-5 h-5" /> : mode === AnalysisMode.COMPARISON ? <Users className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+                بدء {mode === AnalysisMode.COMPARISON ? 'المقارنة التحليلية' : mode === AnalysisMode.PSYCHOLOGICAL ? 'التحليل النفسي' : mode === AnalysisMode.BEHAVIORAL ? 'تحليل السلوك' : 'التحليل المتقدم'}
               </button>
             </form>
 
@@ -285,12 +297,12 @@ const App: React.FC = () => {
               <Loader2 className={`w-20 h-20 ${mode === AnalysisMode.PSYCHOLOGICAL ? 'text-blue-500' : 'text-indigo-500'} animate-spin relative`} />
             </div>
             <h2 className="text-2xl font-bold mb-4">
-              {mode === AnalysisMode.PSYCHOLOGICAL ? 'جاري التحليل النفسي العميق' : mode === AnalysisMode.BEHAVIORAL ? 'جاري تتبع الأنماط السلوكية' : 'جاري إجراء المقارنة البينية'}
+              {mode === AnalysisMode.PSYCHOLOGICAL ? 'جاري التحليل النفسي العميق' : mode === AnalysisMode.BEHAVIORAL ? 'جاري تتبع الأنماط السلوكية' : mode === AnalysisMode.COMPARISON ? 'جاري إجراء المقارنة البينية' : 'جاري التحليل المتقدم المخصص'}
             </h2>
             <div className="space-y-3 max-w-sm">
-              <LoadingStep step={mode === AnalysisMode.COMPARISON ? "استخلاص نقاط التشابه..." : mode === AnalysisMode.PSYCHOLOGICAL ? "تحليل الأنماط اللغوية..." : "استخلاص معدلات النشاط..."} delay={0} />
-              <LoadingStep step={mode === AnalysisMode.COMPARISON ? "قياس فجوة السلوك الرقمي..." : mode === AnalysisMode.PSYCHOLOGICAL ? "حساب مؤشرات الشخصية..." : "حساب عمق المشاركة..."} delay={2000} />
-              <LoadingStep step={mode === AnalysisMode.COMPARISON ? "تحليل التفاعل المتبادل..." : mode === AnalysisMode.PSYCHOLOGICAL ? "استخراج الدوافع الخفية..." : "تحليل فجوات الاستهلاك..."} delay={4000} />
+              <LoadingStep step={mode === AnalysisMode.COMPARISON ? "استخلاص نقاط التشابه..." : mode === AnalysisMode.ADVANCED ? "تحديد السمات المستهدفة..." : mode === AnalysisMode.PSYCHOLOGICAL ? "تحليل الأنماط اللغوية..." : "استخلاص معدلات النشاط..."} delay={0} />
+              <LoadingStep step={mode === AnalysisMode.COMPARISON ? "قياس فجوة السلوك الرقمي..." : mode === AnalysisMode.ADVANCED ? "تحليل الارتباطات السلوكية..." : mode === AnalysisMode.PSYCHOLOGICAL ? "حساب مؤشرات الشخصية..." : "حساب عمق المشاركة..."} delay={2000} />
+              <LoadingStep step={mode === AnalysisMode.COMPARISON ? "تحليل التفاعل المتبادل..." : mode === AnalysisMode.ADVANCED ? "صياغة الاستنتاجات التخصصية..." : mode === AnalysisMode.PSYCHOLOGICAL ? "استخراج الدوافع الخفية..." : "تحليل فجوات الاستهلاك..."} delay={4000} />
               <LoadingStep step="توليد التقرير النهائي..." delay={6000} />
             </div>
           </div>
@@ -325,12 +337,12 @@ const App: React.FC = () => {
             
             <div className="mt-12">
               <div className="flex items-center gap-3 mb-8">
-                <div className={`p-2 ${mode === AnalysisMode.PSYCHOLOGICAL ? 'bg-blue-500/20 text-blue-400' : mode === AnalysisMode.BEHAVIORAL ? 'bg-indigo-500/20 text-indigo-400' : 'bg-cyan-500/20 text-cyan-400'} rounded-lg`}>
-                  {mode === AnalysisMode.PSYCHOLOGICAL ? <UserCircle className="w-8 h-8" /> : mode === AnalysisMode.BEHAVIORAL ? <Activity className="w-8 h-8" /> : <Users className="w-8 h-8" />}
+                <div className={`p-2 ${mode === AnalysisMode.PSYCHOLOGICAL ? 'bg-blue-500/20 text-blue-400' : mode === AnalysisMode.BEHAVIORAL ? 'bg-indigo-500/20 text-indigo-400' : mode === AnalysisMode.COMPARISON ? 'bg-cyan-500/20 text-cyan-400' : 'bg-amber-500/20 text-amber-400'} rounded-lg`}>
+                  {mode === AnalysisMode.PSYCHOLOGICAL ? <UserCircle className="w-8 h-8" /> : mode === AnalysisMode.BEHAVIORAL ? <Activity className="w-8 h-8" /> : mode === AnalysisMode.COMPARISON ? <Users className="w-8 h-8" /> : <Sparkles className="w-8 h-8" />}
                 </div>
                 <div>
                   <h3 className="font-bold text-xl">
-                    تقرير {mode === AnalysisMode.PSYCHOLOGICAL ? 'الشخصية الرقمية' : mode === AnalysisMode.BEHAVIORAL ? 'أنماط السلوك الرقمي' : 'المقارنة التحليلية'}
+                    تقرير {mode === AnalysisMode.PSYCHOLOGICAL ? 'الشخصية الرقمية' : mode === AnalysisMode.BEHAVIORAL ? 'أنماط السلوك الرقمي' : mode === AnalysisMode.COMPARISON ? 'المقارنة التحليلية' : 'التحليل المتقدم المخصص'}
                   </h3>
                   <p className="text-sm text-slate-400">{new Date().toLocaleDateString('ar-EG', { dateStyle: 'long' })}</p>
                 </div>
@@ -395,8 +407,8 @@ const App: React.FC = () => {
                     className="p-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl hover:bg-slate-800 transition-all cursor-pointer group relative"
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <div className={`p-1.5 rounded-lg ${item.mode === AnalysisMode.PSYCHOLOGICAL ? 'bg-blue-500/20 text-blue-400' : item.mode === AnalysisMode.BEHAVIORAL ? 'bg-indigo-500/20 text-indigo-400' : 'bg-cyan-500/20 text-cyan-400'}`}>
-                        {item.mode === AnalysisMode.PSYCHOLOGICAL ? <BrainCircuit className="w-4 h-4" /> : item.mode === AnalysisMode.BEHAVIORAL ? <Activity className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                      <div className={`p-1.5 rounded-lg ${item.mode === AnalysisMode.PSYCHOLOGICAL ? 'bg-blue-500/20 text-blue-400' : item.mode === AnalysisMode.BEHAVIORAL ? 'bg-indigo-500/20 text-indigo-400' : item.mode === AnalysisMode.COMPARISON ? 'bg-cyan-500/20 text-cyan-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                        {item.mode === AnalysisMode.PSYCHOLOGICAL ? <BrainCircuit className="w-4 h-4" /> : item.mode === AnalysisMode.BEHAVIORAL ? <Activity className="w-4 h-4" /> : item.mode === AnalysisMode.COMPARISON ? <Users className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
                       </div>
                       <button 
                         onClick={(e) => deleteFromHistory(item.id, e)}

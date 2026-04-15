@@ -21,7 +21,8 @@ export enum AnalysisStatus {
 export enum AnalysisMode {
   PSYCHOLOGICAL = 'PSYCHOLOGICAL',
   BEHAVIORAL = 'BEHAVIORAL',
-  COMPARISON = 'COMPARISON'
+  COMPARISON = 'COMPARISON',
+  ADVANCED = 'ADVANCED'
 }
 
 export interface HistoryItem {

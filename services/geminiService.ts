@@ -73,6 +73,21 @@ const COMPARISON_PROMPT = `
 4. مقارنة إحصائية شاملة.
 `;
 
+const ADVANCED_PROMPT = `
+التركيز: تحليل متقدم مخصص بناءً على سمات محددة.
+يجب على الذكاء الاصطناعي التركيز بشكل مكثف على السمات أو الأنماط التي حددها المستخدم في "البيانات الإضافية".
+
+المعادلات المطلوبة (اختر الأكثر ملاءمة للسمات المحددة):
+- مؤشر التركيز الموضوعي TFI: $TFI = \frac{\sum w_i \cdot f_i}{\sum f_i}$
+- معامل الارتباط السلوكي المخصص CBC: $CBC = \rho(X_{user}, Y_{pattern})$
+
+الأقسام:
+1. تحليل معمق للسمات المحددة.
+2. الارتباطات السلوكية المرتبطة بهذه السمات.
+3. استنتاجات نفسية تخصصية.
+4. توصيات استراتيجية بناءً على التركيز المختار.
+`;
+
 /**
  * Validates and retrieves the Gemini API Key.
  * Throws a ConfigurationError if the key is missing.
@@ -92,20 +107,54 @@ const getValidatedApiKey = (): string => {
 export const performAnalysis = async (url: string, additionalInfo: string, mode: AnalysisMode, url2?: string): Promise<string> => {
   try {
     const apiKey = getValidatedApiKey();
-    const ai = new GoogleGenAI({ apiKey });
     
     let instruction = BASE_SYSTEM_INSTRUCTION;
     if (mode === AnalysisMode.PSYCHOLOGICAL) instruction += PSYCHOLOGICAL_PROMPT;
     else if (mode === AnalysisMode.BEHAVIORAL) instruction += BEHAVIORAL_PROMPT;
     else if (mode === AnalysisMode.COMPARISON) instruction += COMPARISON_PROMPT;
+    else if (mode === AnalysisMode.ADVANCED) instruction += ADVANCED_PROMPT;
 
     let prompt = "";
     if (mode === AnalysisMode.COMPARISON) {
       prompt = `قم بإجراء مقارنة تحليلية بين الملفين الشخصيين التاليين:\nالملف الأول: ${url}\nالملف الثاني: ${url2}\nالبيانات الإضافية: ${additionalInfo}\nالمطلوب: تحليل أوجه التشابه والاختلاف النفسية والسلوكية بدقة عالية.`;
+    } else if (mode === AnalysisMode.ADVANCED) {
+      prompt = `قم بإجراء تحليل متقدم ومخصص للملف الشخصي التالي: ${url}\nالتركيز المطلوب (السمات/الأنماط): ${additionalInfo}\nالمطلوب: تحليل تخصصي يركز بعمق على الجوانب المحددة مع تقديم أدلة رقمية وإحصائية.`;
     } else {
       prompt = `قم بتحليل الملف الشخصي التالي: ${url}\nالبيانات المتاحة: ${additionalInfo}\nالمطلوب: تحليل ${mode === AnalysisMode.PSYCHOLOGICAL ? 'نفسي عميق' : 'سلوكي رقمي شامل'} مع تقديم إحصائيات دقيقة ورسوم بيانية.`;
     }
 
+    // Check if it's an OpenRouter key
+    if (apiKey.startsWith('sk-or-')) {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "Digital Persona Analyst"
+        },
+        body: JSON.stringify({
+          model: "google/gemini-pro-1.5",
+          messages: [
+            { role: "system", content: instruction },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.7,
+          top_p: 0.9
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || "فشل الاتصال بـ OpenRouter");
+      }
+
+      const data = await response.json();
+      return data.choices[0]?.message?.content || "لم يتم العثور على نتائج للتحليل.";
+    }
+
+    // Default to Google SDK
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: prompt,
@@ -113,7 +162,7 @@ export const performAnalysis = async (url: string, additionalInfo: string, mode:
         systemInstruction: instruction,
         temperature: 0.7,
         topP: 0.9,
-        thinkingConfig: { thinkingBudget: mode === AnalysisMode.COMPARISON ? 5000 : 3000 }
+        thinkingConfig: { thinkingBudget: (mode === AnalysisMode.COMPARISON || mode === AnalysisMode.ADVANCED) ? 5000 : 3000 }
       },
     });
 
