@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   UserCircle, 
   Link, 
@@ -19,8 +19,11 @@ import {
   Users,
   History,
   Trash2,
-  X
+  X,
+  FileText
 } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { performAnalysis } from './services/geminiService';
 import { AnalysisStatus, AnalysisMode, HistoryItem } from './types';
 import ReportRenderer from './components/ReportRenderer';
@@ -36,6 +39,7 @@ const App: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     const savedHistory = localStorage.getItem('analysis_history');
@@ -144,6 +148,42 @@ const App: React.FC = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  };
+
+  const handleExportPDF = async () => {
+    if (!reportRef.current) return;
+    
+    setStatus(AnalysisStatus.LOADING); // Use loading state for feedback
+    
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#020617', // Match bg-slate-950
+        logging: false,
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const fileName = mode === AnalysisMode.PSYCHOLOGICAL 
+        ? 'تقرير_نفسي' 
+        : mode === AnalysisMode.BEHAVIORAL 
+          ? 'تقرير_سلوكي' 
+          : mode === AnalysisMode.COMPARISON
+            ? 'تقرير_مقارنة'
+            : 'تحليل_متقدم';
+      pdf.save(`${fileName}_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error("PDF Export Error:", err);
+      setError("فشل تصدير ملف PDF. يرجى المحاولة مرة أخرى.");
+    } finally {
+      setStatus(AnalysisStatus.SUCCESS);
+    }
   };
 
   return (
@@ -329,10 +369,18 @@ const App: React.FC = () => {
               <button 
                 onClick={handleDownload}
                 className="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 group"
-                title="تحميل التقرير"
+                title="تحميل نصي"
               >
                 <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm hidden sm:inline">تحميل</span>
+                <span className="text-sm hidden sm:inline">نص</span>
+              </button>
+              <button 
+                onClick={handleExportPDF}
+                className="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 group"
+                title="تصدير PDF"
+              >
+                <FileText className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                <span className="text-sm hidden sm:inline">PDF</span>
               </button>
               <div className="w-px h-4 bg-slate-800 mx-1"></div>
               <button 
@@ -344,7 +392,7 @@ const App: React.FC = () => {
               </button>
             </div>
             
-            <div className="mt-12">
+            <div className="mt-12" ref={reportRef}>
               <div className="flex items-center gap-3 mb-8">
                 <div className={`p-2 ${mode === AnalysisMode.PSYCHOLOGICAL ? 'bg-blue-500/20 text-blue-400' : mode === AnalysisMode.BEHAVIORAL ? 'bg-indigo-500/20 text-indigo-400' : mode === AnalysisMode.COMPARISON ? 'bg-cyan-500/20 text-cyan-400' : 'bg-amber-500/20 text-amber-400'} rounded-lg`}>
                   {mode === AnalysisMode.PSYCHOLOGICAL ? <UserCircle className="w-8 h-8" /> : mode === AnalysisMode.BEHAVIORAL ? <Activity className="w-8 h-8" /> : mode === AnalysisMode.COMPARISON ? <Users className="w-8 h-8" /> : <Sparkles className="w-8 h-8" />}

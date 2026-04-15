@@ -11,13 +11,15 @@
   },
   "dependencies": {
     "@google/genai": "^1.40.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "lucide-react": "^0.563.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "lucide-react": "^0.563.0",
     "react-markdown": "^10.1.0",
-    "remark-math": "^6.0.0",
+    "recharts": "^2.12.7",
     "rehype-katex": "^7.0.1",
-    "recharts": "^2.12.7"
+    "remark-math": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
