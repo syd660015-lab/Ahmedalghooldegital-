@@ -64,10 +64,18 @@ const App: React.FC = () => {
   const selectHistoryItem = (item: HistoryItem) => {
     setFbUrl(item.url);
     setFbUrl2(item.url2 || '');
+    setAdditionalInfo(item.additionalInfo || '');
     setMode(item.mode);
     setReport(item.report);
     setStatus(AnalysisStatus.SUCCESS);
     setShowHistory(false);
+  };
+
+  const clearHistory = () => {
+    if (window.confirm('هل أنت متأكد من رغبتك في مسح سجل التحليلات بالكامل؟')) {
+      setHistory([]);
+      localStorage.removeItem('analysis_history');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,9 +93,10 @@ const App: React.FC = () => {
       setStatus(AnalysisStatus.SUCCESS);
       
       saveToHistory({
-        id: crypto.randomUUID(),
+        id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Date.now().toString(),
         url: fbUrl,
         url2: fbUrl2,
+        additionalInfo,
         mode,
         report: result,
         timestamp: Date.now()
@@ -388,9 +397,20 @@ const App: React.FC = () => {
                 <History className="w-6 h-6 text-blue-400" />
                 <h2 className="text-xl font-bold">سجل التحليلات</h2>
               </div>
-              <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
-                <X className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-2">
+                {history.length > 0 && (
+                  <button 
+                    onClick={clearHistory}
+                    className="p-2 hover:bg-red-500/10 text-slate-400 hover:text-red-400 rounded-lg transition-colors"
+                    title="مسح الكل"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
+                <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -420,6 +440,11 @@ const App: React.FC = () => {
                     <div className="space-y-1">
                       <p className="text-sm font-bold truncate dir-ltr text-left">{item.url.replace('https://www.facebook.com/', '')}</p>
                       {item.url2 && <p className="text-xs text-slate-500 truncate dir-ltr text-left">vs {item.url2.replace('https://www.facebook.com/', '')}</p>}
+                      {item.additionalInfo && (
+                        <p className="text-[11px] text-slate-400 line-clamp-1 mt-1 italic">
+                          "{item.additionalInfo}"
+                        </p>
+                      )}
                       <p className="text-[10px] text-slate-500 mt-2">
                         {new Date(item.timestamp).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })}
                       </p>

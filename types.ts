@@ -29,6 +29,7 @@ export interface HistoryItem {
   id: string;
   url: string;
   url2?: string;
+  additionalInfo: string;
   mode: AnalysisMode;
   report: string;
   timestamp: number;
