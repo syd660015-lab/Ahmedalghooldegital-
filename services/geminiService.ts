@@ -1,5 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
+import Bytez from "bytez.js";
 import { AnalysisMode } from "../types";
 
 /**
@@ -151,6 +152,29 @@ export const performAnalysis = async (url: string, additionalInfo: string, mode:
 
       const data = await response.json();
       return data.choices[0]?.message?.content || "لم يتم العثور على نتائج للتحليل.";
+    }
+
+    // Check if it's a Bytez key (32 hex characters)
+    if (/^[0-9a-f]{32}$/i.test(apiKey)) {
+      const sdk = new Bytez(apiKey);
+      const model = sdk.model("mlfoundations-dev/oh-dcft-v3.1-gemini-1.5-flash");
+      
+      const { error, output } = await model.run([
+        {
+          "role": "system",
+          "content": instruction
+        },
+        {
+          "role": "user",
+          "content": prompt
+        }
+      ]);
+
+      if (error) {
+        throw new Error(`Bytez Error: ${error}`);
+      }
+
+      return output || "لم يتم العثور على نتائج للتحليل.";
     }
 
     // Default to Google SDK
