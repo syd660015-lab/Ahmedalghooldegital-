@@ -1,6 +1,5 @@
 
 import { GoogleGenAI } from "@google/genai";
-import Bytez from "bytez.js";
 import { AnalysisMode } from "../types";
 
 /**
@@ -156,25 +155,40 @@ export const performAnalysis = async (url: string, additionalInfo: string, mode:
 
     // Check if it's a Bytez key (32 hex characters)
     if (/^[0-9a-f]{32}$/i.test(apiKey)) {
-      const sdk = new Bytez(apiKey);
-      const model = sdk.model("mlfoundations-dev/oh-dcft-v3.1-gemini-1.5-flash");
-      
-      const { error, output } = await model.run([
-        {
-          "role": "system",
-          "content": instruction
+      const response = await fetch("https://api.bytez.com/models/v2/Qwen/Qwen3-4B", {
+        method: "POST",
+        headers: {
+          "Authorization": apiKey,
+          "Content-Type": "application/json"
         },
-        {
-          "role": "user",
-          "content": prompt
-        }
-      ]);
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content: instruction
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          params: {
+            min_length: 10,
+            max_length: 1000,
+            temperature: 0.7
+          }
+        })
+      });
 
-      if (error) {
-        throw new Error(`Bytez Error: ${error}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "فشل الاتصال بـ Bytez API");
       }
 
-      return output || "لم يتم العثور على نتائج للتحليل.";
+      const data = await response.json();
+      // Bytez v2 often returns results in choices[0].message.content for chat-style models
+      // or directly logic if it's a stream/completion. Based on the curl, it's chat-like.
+      return data.output || data.choices?.[0]?.message?.content || "لم يتم العثور على نتائج للتحليل.";
     }
 
     // Default to Google SDK
