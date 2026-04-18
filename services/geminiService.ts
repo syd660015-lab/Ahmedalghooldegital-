@@ -155,7 +155,7 @@ export const performAnalysis = async (url: string, additionalInfo: string, mode:
 
     // Check if it's a Bytez key (32 hex characters)
     if (/^[0-9a-f]{32}$/i.test(apiKey)) {
-      const response = await fetch("https://api.bytez.com/models/v2/Qwen/Qwen3-4B", {
+      const response = await fetch("https://api.bytez.com/models/v2/google/gemini-3-pro-preview", {
         method: "POST",
         headers: {
           "Authorization": apiKey,
@@ -174,7 +174,7 @@ export const performAnalysis = async (url: string, additionalInfo: string, mode:
           ],
           params: {
             min_length: 10,
-            max_length: 1000,
+            max_length: 2000,
             temperature: 0.7
           }
         })
