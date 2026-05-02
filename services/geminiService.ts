@@ -104,130 +104,160 @@ const getValidatedApiKey = (): string => {
   return apiKey;
 };
 
-export const performAnalysis = async (url: string, additionalInfo: string, mode: AnalysisMode, url2?: string): Promise<string> => {
+const analyzeWithRetry = async (
+  fn: () => Promise<string>,
+  retries = 3,
+  delay = 2000
+): Promise<string> => {
   try {
-    const apiKey = getValidatedApiKey();
-    
-    let instruction = BASE_SYSTEM_INSTRUCTION;
-    if (mode === AnalysisMode.PSYCHOLOGICAL) instruction += PSYCHOLOGICAL_PROMPT;
-    else if (mode === AnalysisMode.BEHAVIORAL) instruction += BEHAVIORAL_PROMPT;
-    else if (mode === AnalysisMode.COMPARISON) instruction += COMPARISON_PROMPT;
-    else if (mode === AnalysisMode.ADVANCED) instruction += ADVANCED_PROMPT;
-
-    let prompt = "";
-    if (mode === AnalysisMode.COMPARISON) {
-      prompt = `قم بإجراء مقارنة تحليلية بين الملفين الشخصيين التاليين:\nالملف الأول: ${url}\nالملف الثاني: ${url2}\nالبيانات الإضافية: ${additionalInfo}\nالمطلوب: تحليل أوجه التشابه والاختلاف النفسية والسلوكية بدقة عالية.`;
-    } else if (mode === AnalysisMode.ADVANCED) {
-      prompt = `قم بإجراء تحليل متقدم ومخصص للملف الشخصي التالي: ${url}\nالتركيز المطلوب (السمات/الأنماط): ${additionalInfo}\nالمطلوب: تحليل تخصصي يركز بعمق على الجوانب المحددة مع تقديم أدلة رقمية وإحصائية.`;
-    } else {
-      prompt = `قم بتحليل الملف الشخصي التالي: ${url}\nالبيانات المتاحة: ${additionalInfo}\nالمطلوب: تحليل ${mode === AnalysisMode.PSYCHOLOGICAL ? 'نفسي عميق' : 'سلوكي رقمي شامل'} مع تقديم إحصائيات دقيقة ورسوم بيانية.`;
-    }
-
-    // Check if it's an OpenRouter key
-    if (apiKey.startsWith('sk-or-')) {
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "Digital Persona Analyst"
-        },
-        body: JSON.stringify({
-          model: "google/gemini-pro-1.5",
-          messages: [
-            { role: "system", content: instruction },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.7,
-          top_p: 0.9
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || "فشل الاتصال بـ OpenRouter");
-      }
-
-      const data = await response.json();
-      return data.choices[0]?.message?.content || "لم يتم العثور على نتائج للتحليل.";
-    }
-
-    // Check if it's a Bytez key (32 hex characters)
-    if (/^[0-9a-f]{32}$/i.test(apiKey)) {
-      const response = await fetch("https://api.bytez.com/models/v2/google/gemini-3-pro-preview", {
-        method: "POST",
-        headers: {
-          "Authorization": apiKey,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: "system",
-              content: instruction
-            },
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          params: {
-            min_length: 10,
-            max_length: 2000,
-            temperature: 0.7
-          }
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "فشل الاتصال بـ Bytez API");
-      }
-
-      const data = await response.json();
-      // Bytez v2 often returns results in choices[0].message.content for chat-style models
-      // or directly logic if it's a stream/completion. Based on the curl, it's chat-like.
-      return data.output || data.choices?.[0]?.message?.content || "لم يتم العثور على نتائج للتحليل.";
-    }
-
-    // Default to Google SDK
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: prompt,
-      config: {
-        systemInstruction: instruction,
-        temperature: 0.7,
-        topP: 0.9,
-        thinkingConfig: { thinkingBudget: (mode === AnalysisMode.COMPARISON || mode === AnalysisMode.ADVANCED) ? 5000 : 3000 }
-      },
-    });
-
-    return response.text || "لم يتم العثور على نتائج للتحليل.";
+    return await fn();
   } catch (error: any) {
-    console.error("Gemini Analysis Error:", error);
+    const errorMessage = error.message || "";
+    const isQuotaError =
+      errorMessage.includes("quota") ||
+      errorMessage.includes("429") ||
+      errorMessage.includes("limit exceeded");
 
-    // Handle ConfigurationError specifically
+    if (isQuotaError && retries > 0) {
+      console.log(`تجاوز الحصة.. إعادة المحاولة بعد ${delay / 1000} ثانية...`);
+      await new Promise((res) => setTimeout(res, delay));
+      return analyzeWithRetry(fn, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+};
+
+export const performAnalysis = async (
+  url: string,
+  additionalInfo: string,
+  mode: AnalysisMode,
+  url2?: string
+): Promise<string> => {
+  try {
+    return await analyzeWithRetry(async () => {
+      const apiKey = getValidatedApiKey();
+      
+      let instruction = BASE_SYSTEM_INSTRUCTION;
+      if (mode === AnalysisMode.PSYCHOLOGICAL) instruction += PSYCHOLOGICAL_PROMPT;
+      else if (mode === AnalysisMode.BEHAVIORAL) instruction += BEHAVIORAL_PROMPT;
+      else if (mode === AnalysisMode.COMPARISON) instruction += COMPARISON_PROMPT;
+      else if (mode === AnalysisMode.ADVANCED) instruction += ADVANCED_PROMPT;
+
+      let prompt = "";
+      if (mode === AnalysisMode.COMPARISON) {
+        prompt = `قم بإجراء مقارنة تحليلية بين الملفين الشخصيين التاليين:\nالملف الأول: ${url}\nالملف الثاني: ${url2}\nالبيانات الإضافية: ${additionalInfo}\nالمطلوب: تحليل أوجه التشابه والاختلاف النفسية والسلوكية بدقة عالية.`;
+      } else if (mode === AnalysisMode.ADVANCED) {
+        prompt = `قم بإجراء تحليل متقدم ومخصص للملف الشخصي التالي: ${url}\nالتركيز المطلوب (السمات/الأنماط): ${additionalInfo}\nالمطلوب: تحليل تخصصي يركز بعمق على الجوانب المحددة مع تقديم أدلة رقمية وإحصائية.`;
+      } else {
+        prompt = `قم بتحليل الملف الشخصي التالي: ${url}\nالبيانات المتاحة: ${additionalInfo}\nالمطلوب: تحليل ${mode === AnalysisMode.PSYCHOLOGICAL ? 'نفسي عميق' : 'سلوكي رقمي شامل'} مع تقديم إحصائيات دقيقة ورسوم بيانية.`;
+      }
+
+      // Check if it's an OpenRouter key
+      if (apiKey.startsWith('sk-or-')) {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": window.location.origin,
+            "X-Title": "Digital Persona Analyst"
+          },
+          body: JSON.stringify({
+            model: "google/gemini-pro-1.5",
+            messages: [
+              { role: "system", content: instruction },
+              { role: "user", content: prompt }
+            ],
+            temperature: 0.7,
+            top_p: 0.9
+          })
+        });
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            throw new Error("429: Quota exceeded");
+          }
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error?.message || errorData.error || "فشل الاتصال بـ OpenRouter");
+        }
+
+        const data = await response.json();
+        return data.choices[0]?.message?.content || "لم يتم العثور على نتائج للتحليل.";
+      }
+
+      // Check if it's a Bytez key (32 hex characters)
+      if (/^[0-9a-f]{32}$/i.test(apiKey)) {
+        const response = await fetch("https://api.bytez.com/models/v2/google/gemini-3-pro-preview", {
+          method: "POST",
+          headers: {
+            "Authorization": apiKey,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: "system",
+                content: instruction
+              },
+              {
+                role: "user",
+                content: prompt
+              }
+            ],
+            params: {
+              min_length: 10,
+              max_length: 2000,
+              temperature: 0.7
+            }
+          } as any)
+        });
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            throw new Error("429: Quota exceeded");
+          }
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "فشل الاتصال بـ Bytez API");
+        }
+
+        const data = await response.json();
+        return data.output || data.choices?.[0]?.message?.content || "لم يتم العثور على نتائج للتحليل.";
+      }
+
+      // Default to Google SDK
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: {
+          systemInstruction: instruction,
+          temperature: 0.7,
+          topP: 0.9,
+        },
+      });
+
+      return response.text || "لم يتم العثور على نتائج للتحليل.";
+    });
+  } catch (error: any) {
+    console.error("Analysis Final Error:", error);
+
     if (error instanceof ConfigurationError) {
       throw error;
     }
 
-    // Handle specific API provider errors
     const errorMessage = error.message || "";
-    if (errorMessage.includes("API key not valid") || errorMessage.includes("invalid API key") || errorMessage.includes("401") || errorMessage.includes("403")) {
-      throw new Error("عفواً، مفتاح API المستخدم غير صالح أو منتهي الصلاحية. يرجى مراجعة إعدادات API_KEY الخاصة بك.");
+    if (errorMessage.includes("401") || errorMessage.includes("403") || errorMessage.includes("invalid API key")) {
+      throw new Error("عفواً، مفتاح API المستخدم غير صالح أو منتهي الصلاحية. يرجى مراجعة الإعدادات.");
     }
     
     if (errorMessage.includes("safety") || errorMessage.includes("blocked")) {
-      throw new Error("تم حظر الطلب بواسطة فلاتر الأمان. المحتوى قد يكون حساساً جداً للتحليل الآلي.");
+      throw new Error("تم حظر الطلب بواسطة فلاتر الأمان. المحتوى قد يكون حساساً جداً.");
     }
 
     if (errorMessage.includes("quota") || errorMessage.includes("429")) {
-      throw new Error("تم تجاوز حد الحصص المتاحة (Quota exceeded). يرجى المحاولة مرة أخرى لاحقاً.");
+      throw new Error("تم تجاوز حد الحصص المتاحة (Quota exceeded) حتى بعد محاولات الإعادة. يرجى الانتظار ثم المحاولة لاحقاً.");
     }
 
-    // Default Arabic error message
-    throw new Error("حدث خطأ تقني أثناء محاولة تحليل البيانات. يرجى التأكد من اتصال الإنترنت وصلاحية مفتاح API والمحاولة مرة أخرى.");
+    throw new Error("حدث خطأ تقني غير متوقع. يرجى المحاولة مرة أخرى لاحقاً.");
   }
 };
